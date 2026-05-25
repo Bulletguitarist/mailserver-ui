@@ -1,100 +1,74 @@
 import { useEffect, useState } from 'react';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
-import { RefreshCw, Shield, ShieldAlert, X, Lock, Unlock } from 'lucide-react';
+import { RefreshCw, Lock, Unlock, X } from 'lucide-react';
 
-export default function Inbox() {
+export default function Sent() {
   const [emails, setEmails]     = useState([]);
   const [loading, setLoading]   = useState(true);
   const [selected, setSelected] = useState(null);
 
-  const fetchInbox = async () => {
+  const fetchSent = async () => {
     setLoading(true);
     try {
-      const { data } = await api.get('/api/mail/inbox');
+      const { data } = await api.get('/api/mail/sent');
       setEmails(data.emails || []);
     } catch {
-      toast.error('Failed to fetch inbox');
+      toast.error('Failed to fetch sent emails');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchInbox(); }, []);
-
-  const openEmail = async (email) => {
-    setSelected(email);
-    if (!email.is_read) {
-      try {
-        await api.patch(`/api/mail/${email.id}/read`);
-        setEmails(prev => prev.map(e => e.id === email.id ? { ...e, is_read: 1 } : e));
-      } catch {}
-    }
-  };
+  useEffect(() => { fetchSent(); }, []);
 
   return (
     <div style={styles.container}>
-      {/* Email detail modal */}
       {selected && (
         <div style={styles.overlay} onClick={() => setSelected(null)}>
           <div style={styles.modal} onClick={e => e.stopPropagation()}>
             <div style={styles.modalHeader}>
               <div>
                 <div style={styles.modalSubject}>{selected.subject || '(no subject)'}</div>
-                <div style={styles.modalMeta}>From: {selected.from_address}</div>
-                <div style={styles.modalMeta}>To: {JSON.parse(selected.to_addresses || '[]').join(', ')}</div>
-                <div style={styles.modalMeta}>Date: {selected.received_at || selected.created_at}</div>
+                <div style={styles.modalMeta}>To: {(selected.to_addresses || []).join(', ')}</div>
+                <div style={styles.modalMeta}>Sent: {selected.sent_at || selected.created_at}</div>
               </div>
               <button style={styles.closeBtn} onClick={() => setSelected(null)}><X size={20} /></button>
             </div>
             <div style={styles.modalEncryption}>
-              {selected.is_encrypted
+              {selected.encrypted
                 ? <span style={styles.encTag}><Lock size={12} /> Encrypted</span>
                 : <span style={styles.plainTag}><Unlock size={12} /> Not encrypted</span>}
-            </div>
-            <div style={styles.modalBody}>
-              {selected.is_encrypted
-                ? '🔒 This message is encrypted. Decrypt with your private key to read.'
-                : selected.body_encrypted || '(empty)'}
             </div>
           </div>
         </div>
       )}
 
       <div style={styles.header}>
-        <h2 style={styles.title}>Inbox</h2>
-        <button style={styles.refreshBtn} onClick={fetchInbox}>
+        <h2 style={styles.title}>Sent</h2>
+        <button style={styles.refreshBtn} onClick={fetchSent}>
           <RefreshCw size={16} /> Refresh
         </button>
       </div>
 
       {loading ? (
-        <div style={styles.loading}>Fetching emails...</div>
+        <div style={styles.loading}>Loading...</div>
       ) : emails.length === 0 ? (
-        <div style={styles.empty}>No emails yet</div>
+        <div style={styles.empty}>No sent emails yet</div>
       ) : (
         <div style={styles.list}>
           {emails.map((email, i) => (
-            <div key={i} style={{
-              ...styles.emailCard,
-              borderLeft: email.is_read ? '4px solid transparent' : '4px solid #2E86C1',
-              cursor: 'pointer',
-            }} onClick={() => openEmail(email)}>
+            <div key={i} style={styles.emailCard} onClick={() => setSelected(email)}>
               <div style={styles.emailTop}>
-                <span style={styles.from}>{email.from_address || 'Unknown'}</span>
-                <span style={styles.date}>{email.received_at || email.created_at}</span>
+                <span style={styles.to}>To: {(email.to_addresses || []).join(', ')}</span>
+                <span style={styles.date}>{email.sent_at || email.created_at}</span>
               </div>
-              <div style={{ ...styles.subject, fontWeight: email.is_read ? 400 : 700 }}>
-                {email.subject || '(no subject)'}
-              </div>
+              <div style={styles.subject}>{email.subject || '(no subject)'}</div>
               <div style={styles.tags}>
-                {email.spam?.isSpam
-                  ? <span style={styles.tagSpam}><ShieldAlert size={12} /> SPAM</span>
-                  : <span style={styles.tagClean}><Shield size={12} /> Clean</span>}
-                <span style={styles.tagScore}>Score: {email.spam?.score ?? 0}</span>
-                {email.is_encrypted
+                {email.encrypted
                   ? <span style={styles.encTag}><Lock size={12} /> Encrypted</span>
-                  : null}
+                  : <span style={styles.plainTag}><Unlock size={12} /> Not encrypted</span>}
+                <span style={styles.statusTag}>{email.status || 'sent'}</span>
               </div>
             </div>
           ))}
@@ -112,17 +86,15 @@ const styles = {
   loading: { textAlign: 'center', padding: 60, color: '#777' },
   empty: { textAlign: 'center', padding: 60, color: '#aaa', fontSize: 16 },
   list: { display: 'flex', flexDirection: 'column', gap: 12 },
-  emailCard: { background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', transition: 'box-shadow 0.2s' },
+  emailCard: { background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', cursor: 'pointer' },
   emailTop: { display: 'flex', justifyContent: 'space-between', marginBottom: 6 },
-  from: { fontWeight: 600, color: '#1E3A5F', fontSize: 14 },
+  to: { fontWeight: 600, color: '#1E3A5F', fontSize: 14 },
   date: { color: '#aaa', fontSize: 12 },
-  subject: { fontSize: 15, color: '#333', marginBottom: 10 },
-  tags: { display: 'flex', gap: 8, flexWrap: 'wrap' },
-  tagSpam: { display: 'flex', alignItems: 'center', gap: 4, background: '#fde8e8', color: '#c0392b', padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 600 },
-  tagClean: { display: 'flex', alignItems: 'center', gap: 4, background: '#e8f8f0', color: '#1e8449', padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 600 },
-  tagScore: { background: '#eef', color: '#555', padding: '2px 8px', borderRadius: 20, fontSize: 11 },
+  subject: { fontSize: 15, color: '#333', marginBottom: 10, fontWeight: 500 },
+  tags: { display: 'flex', gap: 8 },
   encTag: { display: 'flex', alignItems: 'center', gap: 4, background: '#e8f0fe', color: '#2E86C1', padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 600 },
   plainTag: { display: 'flex', alignItems: 'center', gap: 4, background: '#fff8e8', color: '#d35400', padding: '2px 8px', borderRadius: 20, fontSize: 11 },
+  statusTag: { background: '#e8f8f0', color: '#1e8449', padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 600 },
   overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
   modal: { background: '#fff', borderRadius: 16, padding: 32, width: '90%', maxWidth: 600, maxHeight: '80vh', overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.2)' },
   modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
@@ -130,5 +102,4 @@ const styles = {
   modalMeta: { fontSize: 13, color: '#777', marginBottom: 4 },
   closeBtn: { background: 'none', border: 'none', cursor: 'pointer', color: '#777', padding: 4 },
   modalEncryption: { marginBottom: 16 },
-  modalBody: { fontSize: 15, color: '#333', lineHeight: 1.6, whiteSpace: 'pre-wrap', background: '#f8f9fa', padding: 16, borderRadius: 8 },
 };
