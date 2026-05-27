@@ -23,39 +23,50 @@ export default function Inbox() {
   useEffect(() => { fetchInbox(); }, []);
 
   const openEmail = async (email) => {
-    setSelected(email);
-    if (!email.is_read) {
-      try {
+    try {
+      setSelected(email);
+      if (!email.is_read) {
         await api.patch(`/api/mail/${email.id}/read`);
         setEmails(prev => prev.map(e => e.id === email.id ? { ...e, is_read: 1 } : e));
-      } catch {}
+      }
+    } catch (err) {
+      console.error('Error opening email:', err);
     }
+  };
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '';
+    try {
+      return new Date(dateStr).toLocaleString('en-IN', {
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      });
+    } catch { return dateStr; }
   };
 
   return (
     <div style={styles.container}>
-      {/* Email detail modal */}
       {selected && (
         <div style={styles.overlay} onClick={() => setSelected(null)}>
           <div style={styles.modal} onClick={e => e.stopPropagation()}>
             <div style={styles.modalHeader}>
-              <div>
+              <div style={{ flex: 1 }}>
                 <div style={styles.modalSubject}>{selected.subject || '(no subject)'}</div>
-                <div style={styles.modalMeta}>From: {selected.from_address}</div>
-                <div style={styles.modalMeta}>To: {JSON.parse(selected.to_addresses || '[]').join(', ')}</div>
-                <div style={styles.modalMeta}>Date: {selected.received_at || selected.created_at}</div>
+                <div style={styles.modalMeta}>From: {selected.from_address || 'Unknown'}</div>
+                <div style={styles.modalMeta}>To: {(() => { try { return JSON.parse(selected.to_addresses || '[]').join(', '); } catch { return selected.to_addresses; } })()}</div>
+                <div style={styles.modalMeta}>Date: {formatDate(selected.received_at || selected.created_at)}</div>
               </div>
               <button style={styles.closeBtn} onClick={() => setSelected(null)}><X size={20} /></button>
             </div>
             <div style={styles.modalEncryption}>
               {selected.is_encrypted
-                ? <span style={styles.encTag}><Lock size={12} /> Encrypted</span>
-                : <span style={styles.plainTag}><Unlock size={12} /> Not encrypted</span>}
+                ? <span style={styles.encTag}><Lock size={12} /> End-to-End Encrypted</span>
+                : <span style={styles.plainTag}><Unlock size={12} /> Not Encrypted</span>}
             </div>
             <div style={styles.modalBody}>
               {selected.is_encrypted
                 ? '🔒 This message is encrypted. Decrypt with your private key to read.'
-                : selected.body_encrypted || '(empty)'}
+                : (selected.body_encrypted || '(empty message)')}
             </div>
           </div>
         </div>
@@ -82,7 +93,7 @@ export default function Inbox() {
             }} onClick={() => openEmail(email)}>
               <div style={styles.emailTop}>
                 <span style={styles.from}>{email.from_address || 'Unknown'}</span>
-                <span style={styles.date}>{email.received_at || email.created_at}</span>
+                <span style={styles.date}>{formatDate(email.received_at || email.created_at)}</span>
               </div>
               <div style={{ ...styles.subject, fontWeight: email.is_read ? 400 : 700 }}>
                 {email.subject || '(no subject)'}
@@ -94,7 +105,7 @@ export default function Inbox() {
                 <span style={styles.tagScore}>Score: {email.spam?.score ?? 0}</span>
                 {email.is_encrypted
                   ? <span style={styles.encTag}><Lock size={12} /> Encrypted</span>
-                  : null}
+                  : <span style={styles.plainTag}><Unlock size={12} /> Not Encrypted</span>}
               </div>
             </div>
           ))}
@@ -125,10 +136,10 @@ const styles = {
   plainTag: { display: 'flex', alignItems: 'center', gap: 4, background: '#fff8e8', color: '#d35400', padding: '2px 8px', borderRadius: 20, fontSize: 11 },
   overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
   modal: { background: '#fff', borderRadius: 16, padding: 32, width: '90%', maxWidth: 600, maxHeight: '80vh', overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.2)' },
-  modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
+  modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, gap: 16 },
   modalSubject: { fontSize: 20, fontWeight: 700, color: '#1E3A5F', marginBottom: 8 },
   modalMeta: { fontSize: 13, color: '#777', marginBottom: 4 },
-  closeBtn: { background: 'none', border: 'none', cursor: 'pointer', color: '#777', padding: 4 },
+  closeBtn: { background: 'none', border: 'none', cursor: 'pointer', color: '#777', padding: 4, flexShrink: 0 },
   modalEncryption: { marginBottom: 16 },
   modalBody: { fontSize: 15, color: '#333', lineHeight: 1.6, whiteSpace: 'pre-wrap', background: '#f8f9fa', padding: 16, borderRadius: 8 },
 };

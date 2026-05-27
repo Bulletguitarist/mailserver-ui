@@ -22,23 +22,33 @@ export default function Sent() {
 
   useEffect(() => { fetchSent(); }, []);
 
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '';
+    try {
+      return new Date(dateStr).toLocaleString('en-IN', {
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      });
+    } catch { return dateStr; }
+  };
+
   return (
     <div style={styles.container}>
       {selected && (
         <div style={styles.overlay} onClick={() => setSelected(null)}>
           <div style={styles.modal} onClick={e => e.stopPropagation()}>
             <div style={styles.modalHeader}>
-              <div>
+              <div style={{ flex: 1 }}>
                 <div style={styles.modalSubject}>{selected.subject || '(no subject)'}</div>
                 <div style={styles.modalMeta}>To: {(selected.to_addresses || []).join(', ')}</div>
-                <div style={styles.modalMeta}>Sent: {selected.sent_at || selected.created_at}</div>
+                <div style={styles.modalMeta}>Sent: {formatDate(selected.sent_at || selected.created_at)}</div>
               </div>
               <button style={styles.closeBtn} onClick={() => setSelected(null)}><X size={20} /></button>
             </div>
             <div style={styles.modalEncryption}>
               {selected.encrypted
-                ? <span style={styles.encTag}><Lock size={12} /> Encrypted</span>
-                : <span style={styles.plainTag}><Unlock size={12} /> Not encrypted</span>}
+                ? <span style={styles.encTag}><Lock size={12} /> End-to-End Encrypted</span>
+                : <span style={styles.plainTag}><Unlock size={12} /> Not Encrypted</span>}
             </div>
           </div>
         </div>
@@ -61,13 +71,13 @@ export default function Sent() {
             <div key={i} style={styles.emailCard} onClick={() => setSelected(email)}>
               <div style={styles.emailTop}>
                 <span style={styles.to}>To: {(email.to_addresses || []).join(', ')}</span>
-                <span style={styles.date}>{email.sent_at || email.created_at}</span>
+                <span style={styles.date}>{formatDate(email.sent_at || email.created_at)}</span>
               </div>
               <div style={styles.subject}>{email.subject || '(no subject)'}</div>
               <div style={styles.tags}>
                 {email.encrypted
                   ? <span style={styles.encTag}><Lock size={12} /> Encrypted</span>
-                  : <span style={styles.plainTag}><Unlock size={12} /> Not encrypted</span>}
+                  : <span style={styles.plainTag}><Unlock size={12} /> Not Encrypted</span>}
                 <span style={styles.statusTag}>{email.status || 'sent'}</span>
               </div>
             </div>
@@ -97,9 +107,9 @@ const styles = {
   statusTag: { background: '#e8f8f0', color: '#1e8449', padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 600 },
   overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
   modal: { background: '#fff', borderRadius: 16, padding: 32, width: '90%', maxWidth: 600, maxHeight: '80vh', overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.2)' },
-  modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
+  modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, gap: 16 },
   modalSubject: { fontSize: 20, fontWeight: 700, color: '#1E3A5F', marginBottom: 8 },
   modalMeta: { fontSize: 13, color: '#777', marginBottom: 4 },
-  closeBtn: { background: 'none', border: 'none', cursor: 'pointer', color: '#777', padding: 4 },
+  closeBtn: { background: 'none', border: 'none', cursor: 'pointer', color: '#777', padding: 4, flexShrink: 0 },
   modalEncryption: { marginBottom: 16 },
 };
