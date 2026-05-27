@@ -7,6 +7,8 @@ export default function Inbox() {
   const [emails, setEmails]     = useState([]);
   const [loading, setLoading]   = useState(true);
   const [selected, setSelected] = useState(null);
+  const [privateKey, setPrivateKey] = useState('');
+  const [decrypted, setDecrypted]   = useState('');
 
   const fetchInbox = async () => {
     setLoading(true);
@@ -25,12 +27,31 @@ export default function Inbox() {
   const openEmail = async (email) => {
     try {
       setSelected(email);
+      setPrivateKey('');
+      setDecrypted('');
       if (!email.is_read) {
         await api.patch(`/api/mail/${email.id}/read`);
         setEmails(prev => prev.map(e => e.id === email.id ? { ...e, is_read: 1 } : e));
       }
     } catch (err) {
       console.error('Error opening email:', err);
+    }
+  };
+
+  const decryptEmail = async (email) => {
+    try {
+      if (!privateKey) {
+        toast.error('Please enter your private key!');
+        return;
+      }
+      const { data } = await api.post('/api/mail/decrypt', {
+        encryptedBody: email.body_encrypted,
+        privateKey,
+      });
+      setDecrypted(data.decrypted);
+      toast.success('Decrypted! 🔓');
+    } catch (err) {
+      toast.error('Decryption failed — wrong private key?');
     }
   };
 
@@ -53,21 +74,50 @@ export default function Inbox() {
               <div style={{ flex: 1 }}>
                 <div style={styles.modalSubject}>{selected.subject || '(no subject)'}</div>
                 <div style={styles.modalMeta}>From: {selected.from_address || 'Unknown'}</div>
-                <div style={styles.modalMeta}>To: {(() => { try { return JSON.parse(selected.to_addresses || '[]').join(', '); } catch { return selected.to_addresses; } })()}</div>
+                <div style={styles.modalMeta}>
+                  To: {(() => { try { return JSON.parse(selected.to_addresses || '[]').join(', '); } catch { return selected.to_addresses; } })()}
+                </div>
                 <div style={styles.modalMeta}>Date: {formatDate(selected.received_at || selected.created_at)}</div>
               </div>
               <button style={styles.closeBtn} onClick={() => setSelected(null)}><X size={20} /></button>
             </div>
+
             <div style={styles.modalEncryption}>
               {selected.is_encrypted
                 ? <span style={styles.encTag}><Lock size={12} /> End-to-End Encrypted</span>
                 : <span style={styles.plainTag}><Unlock size={12} /> Not Encrypted</span>}
             </div>
-            <div style={styles.modalBody}>
-              {selected.is_encrypted
-                ? '🔒 This message is encrypted. Decrypt with your private key to read.'
-                : (selected.body_encrypted || '(empty message)')}
-            </div>
+
+            {selected.is_encrypted ? (
+              <div>
+                <div style={styles.modalBody}>
+                  🔒 This message is encrypted. Enter your private key to decrypt.
+                </div>
+                <div style={{ marginTop: 12 }}>
+                  <textarea
+                    style={styles.privateKeyInput}
+                    placeholder="Paste your private key here..."
+                    value={privateKey}
+                    onChange={e => setPrivateKey(e.target.value)}
+                  />
+                  <button
+                    style={styles.decryptBtn}
+                    onClick={() => decryptEmail(selected)}
+                  >
+                    🔓 Decrypt Message
+                  </button>
+                  {decrypted && (
+                    <div style={styles.decryptedBody}>
+                      {decrypted}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div style={styles.modalBody}>
+                {selected.body_encrypted || '(empty message)'}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -142,4 +192,7 @@ const styles = {
   closeBtn: { background: 'none', border: 'none', cursor: 'pointer', color: '#777', padding: 4, flexShrink: 0 },
   modalEncryption: { marginBottom: 16 },
   modalBody: { fontSize: 15, color: '#333', lineHeight: 1.6, whiteSpace: 'pre-wrap', background: '#f8f9fa', padding: 16, borderRadius: 8 },
+  privateKeyInput: { width: '100%', height: 80, padding: 10, borderRadius: 8, border: '1px solid #ddd', fontFamily: 'monospace', fontSize: 12, resize: 'vertical', boxSizing: 'border-box' },
+  decryptBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#1e8449', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 16px', cursor: 'pointer', fontSize: 14, fontWeight: 600, marginTop: 8, width: '100%' },
+  decryptedBody: { marginTop: 12, fontSize: 15, color: '#1e8449', lineHeight: 1.6, whiteSpace: 'pre-wrap', background: '#e8f8f0', padding: 16, borderRadius: 8, border: '1px solid #1e8449' },
 };
